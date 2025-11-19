@@ -16,10 +16,9 @@
     <a href="https://bogus2000.github.io/"><strong>Hyeonwoo Yu</strong></a>
   </p>
 
-  <h3 align="center">Sungkyunkwan University</h3>
 
 
-  <h3 align="center"><a href="a">Paper</a> | <a href="b">Project Page</a>
+  <h3 align="center"><a href="a">Paper</a> | <a href="https://lab-of-ai-and-robotics.github.io/LEGO-SLAM/">Project Page</a>
   <div align="center"></div>
 </p>
 
@@ -35,7 +34,7 @@
 <p align="center"> -->
 
 
-LEGO-SLAM Overview.
+## LEGO-SLAM Overview.
 <p align="center">
   <a href="">
     <img src="./media/overview.png" alt="Logo" width="100%">
@@ -43,7 +42,7 @@ LEGO-SLAM Overview.
 </p>
 <p align="center">
 </p>
-
+LEGO-SLAM is a 3DGS-based SLAM framework that supports open-vocabulary semantic querying and rendering. It tracks via G-ICP and efficiently builds a map by embedding Gaussians with scene-adaptive 16D language features. Map management is achieved through Language Pruning and Language-Based Loop Detection. The generated map enables open-vocabulary 3D Object Localization.
 <!-- ## Citation
 ```bibtex
 
