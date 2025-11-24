@@ -123,12 +123,29 @@ $(document).ready(function() {
     // Check for click events on the navbar burger icon
 
     var options = {
-		slidesToScroll: 1,
-		slidesToShow: 1,
+		slidesToScroll: 1,  // 하나씩 스크롤
+		slidesToShow: 3,    // 한 번에 3개 표시
 		loop: true,
 		infinite: true,
-		autoplay: true,
+		autoplay: false,    // 수동 조작을 위해 자동재생 끄기
 		autoplaySpeed: 5000,
+        // 반응형 설정
+        responsive: [
+            {
+                breakpoint: 768,
+                settings: {
+                    slidesToShow: 1,
+                    slidesToScroll: 1
+                }
+            },
+            {
+                breakpoint: 1024,
+                settings: {
+                    slidesToShow: 2,
+                    slidesToScroll: 1
+                }
+            }
+        ]
     }
 
 	// Initialize all div with carousel class

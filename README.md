@@ -18,7 +18,7 @@
 
 
 
-  <h3 align="center"><a href="a">Paper</a> | <a href="https://lab-of-ai-and-robotics.github.io/LEGO-SLAM/">Project Page</a>
+  <h3 align="center"><a href="https://arxiv.org/abs/2511.16144v1">Paper</a> | <a href="https://lab-of-ai-and-robotics.github.io/LEGO-SLAM/">Project Page</a>
   <div align="center"></div>
 </p>
 

@@ -258,16 +258,96 @@ body {
   padding: 1rem 0;
 }
 
-.results-carousel .item {
-  margin: 1rem;
-  overflow: hidden;
-  padding: 1.5rem;
-  font-size: 0;
+.video-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+@media (min-width: 1024px) {
+  .video-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.video-item {
+  position: relative;
   background: var(--background-primary);
   border-radius: var(--border-radius-lg);
   box-shadow: var(--shadow-md);
   transition: var(--transition);
   border: 1px solid var(--border-color);
+  padding: 1rem;
+  overflow: hidden;
+}
+
+.video-item:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+}
+
+.video-item video {
+  width: 100%;
+  height: auto;
+  border-radius: var(--border-radius);
+}
+
+.video-item .subtitle {
+  margin-top: 1rem;
+  font-size: 1rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* 3D Relevancy Maps Styling */
+.comparison-row {
+  margin-bottom: 3rem;
+}
+
+.comparison-row .subtitle.is-5 {
+  margin-bottom: 1.5rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.comparison-row .subtitle.is-6 {
+  margin-bottom: 1rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.gif-container {
+  position: relative;
+  background: var(--background-primary);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  transition: var(--transition);
+  border: 1px solid var(--border-color);
+}
+
+.gif-container:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+}
+
+.gif-container img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: var(--border-radius-lg);
+}
+
+/* Responsive styling for comparisons */
+@media (max-width: 768px) {
+  .comparison-row .columns {
+    flex-direction: column;
+  }
+
+  .comparison-row .column {
+    margin-bottom: 1rem;
+  }
 }
 
 .results-carousel .item:hover {
@@ -642,9 +722,13 @@ code {
     top: auto;
   }
   
-  .results-carousel .item {
-    margin: 0.5rem;
-    padding: 1rem;
+  .video-grid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+
+  .video-item {
+    padding: 0.75rem;
   }
   
   .teaser .hero-body {
@@ -700,6 +784,11 @@ code {
 @media screen and (min-width: 769px) and (max-width: 1024px) {
   .hero-body {
     padding: 3rem 2rem;
+  }
+
+  .video-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
   }
   
   .publication-header .hero-body {
