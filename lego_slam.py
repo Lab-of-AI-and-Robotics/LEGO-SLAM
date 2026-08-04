@@ -39,6 +39,13 @@ class Pipe():
 class LEGO_SLAM(SLAMParameters):
     def __init__(self, args):
         super().__init__()
+        # feature mode preset: online = SED+HR live (768, no pretrained); offline = LSeg .pt (512, pretrained)
+        self.feature_mode = args.feature_mode
+        os.environ["LEGO_FEATURE_MODE"] = self.feature_mode
+        if self.feature_mode == "online":
+            args.semantic_feature_dim = 768
+            args.pretrained_encoder_path = ""
+            args.pretrained_decoder_path = ""
         self.dataset_path = args.dataset_path
         self.config = args.config
         self.output_path = args.output_path
@@ -67,6 +74,8 @@ class LEGO_SLAM(SLAMParameters):
         self.max_sample_size = int(args.max_sample_size)
         self.sample_ratio = float(args.sample_ratio)
         self.k_nearest = int(args.k_nearest)
+        self.prune_min_opacity = float(args.prune_min_opacity)
+        self.prune_th_cli = float(args.prune_th)
         # self.system_fps_limit = float(args.system_fps_limit) if hasattr(args, 'system_fps_limit') else 20.0
         self.system_fps_limit = float(args.system_fps_limit)
         self.pretrained_encoder_path = args.pretrained_encoder_path
@@ -406,6 +415,8 @@ if __name__ == "__main__":
     
     ## Feature & Processing Parameters  
     parser.add_argument("--downsample_rate", default=10)
+    parser.add_argument("--feature_mode", default="online", choices=["online", "offline"],
+                        help="online: SED+HR live (768); offline: precomputed LSeg .pt (512)")
     parser.add_argument("--semantic_feature_dim", default=512)
     parser.add_argument("--point_feature_dim", default=16) 
     parser.add_argument("--semantic_feature_init", action="store_true", default=False)
@@ -427,11 +438,14 @@ if __name__ == "__main__":
     parser.add_argument("--dist_threshold", default=0.05, help="distance threshold for language-based pruning")
     parser.add_argument("--sim_threshold", default=0.92, help="similarity threshold for language-based pruning")
     parser.add_argument("--max_sample_size", default=3000, type=int, help="maximum sample size for language-based pruning")
+    parser.add_argument("--prune_min_opacity", default=0.005, help="min opacity threshold for geometric pruning (raise to make geo pruning aggressive)")
+    parser.add_argument("--prune_th", default=-1.0, help="size pruning extent override (lower=more aggressive size pruning); -1 uses dataset default")
     parser.add_argument("--sample_ratio", default=0.1, type=float, help="sample ratio for language-based pruning")
     parser.add_argument("--k_nearest", default=100, type=int, help="k nearest neighbors for language-based pruning")
     
     ## Loop Closing Parameters
-    parser.add_argument("--enable_loop_closing", action="store_true", default=False, help="enable loop closing (default: False)")
+    parser.add_argument("--enable_loop_closing", action="store_true", default=True, help="enable loop closing (default: True, all scenes)")
+    parser.add_argument("--disable_loop_closing", dest="enable_loop_closing", action="store_false", help="disable loop closing")
     ## Network Parameters
     parser.add_argument("--pretrained_encoder_path", help="pretrained encoder path", default="")
     parser.add_argument("--pretrained_decoder_path", help="pretrained decoder path", default="")

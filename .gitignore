@@ -2,3 +2,15 @@ __pycache__/
 *.pyc
 *.pyo
 .DS_Store
+
+# online (SED+HR) model weights — download separately, see README
+clip_sed/weights/
+
+# LSeg checkpoint (offline mode) — download separately, see README
+Lseg/demo_e200.ckpt
+
+# run outputs
+experiments/
+replica_results.txt
+tum_results.txt
+scannet_results.txt

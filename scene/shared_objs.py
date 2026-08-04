@@ -7,6 +7,17 @@ import copy
 import math
 import os
 
+
+def get_semantic_feature(rgb_image, dataset_path, feature_name):
+    """Feature source switched by env var LEGO_FEATURE_MODE (set in lego_slam.py).
+    online: SED+HR extracted live from RGB (768);  offline: precomputed LSeg .pt (512)."""
+    if os.environ.get("LEGO_FEATURE_MODE", "online") == "online":
+        from clip_sed.extractor import extract
+        return extract(rgb_image)
+    path = f"{dataset_path}/rgb_feature_langseg/{feature_name}"
+    return torch.load(path, map_location='cpu').half()
+
+
 def getWorld2View2(R, t, translate=np.array([.0, .0, .0]), scale=1.0):
     Rt = torch.zeros((4, 4))
     Rt[:3, :3] = R
@@ -274,8 +285,7 @@ class SharedCam(nn.Module):
         
         # Load semantic feature immediately and store it
         if dataset_path is not None:
-            semantic_feature_path = f"{dataset_path}/rgb_feature_langseg/{self.get_semantic_feature_name()}"
-            self.semantic_feature_image = torch.load(semantic_feature_path, map_location='cpu').half()
+            self.semantic_feature_image = get_semantic_feature(image, dataset_path, self.get_semantic_feature_name())
         else:
             self.semantic_feature_image = None
 
@@ -410,8 +420,7 @@ class SharedCam(nn.Module):
         
 
         if self.dataset_path is not None:
-            semantic_feature_path = f"{self.dataset_path}/rgb_feature_langseg/{self.get_semantic_feature_name()}"
-            self.semantic_feature_image[:,:,:] = torch.load(semantic_feature_path, map_location='cpu').half()
+            self.semantic_feature_image[:,:,:] = get_semantic_feature(rgb_img, self.dataset_path, self.get_semantic_feature_name())
 
 
     def get_semantic_feature_name(self):
@@ -491,8 +500,7 @@ class MappingCam(nn.Module):
         self.semantic_feature_image = None
         if semantic_feature_name and dataset_path:
             try:
-                semantic_feature_path = f"{dataset_path}/rgb_feature_langseg/{semantic_feature_name}"
-                self.semantic_feature_image = torch.load(semantic_feature_path, map_location='cpu').half().pin_memory()
+                self.semantic_feature_image = get_semantic_feature(image, dataset_path, semantic_feature_name).pin_memory()
             except:
                 self.semantic_feature_image = None
         

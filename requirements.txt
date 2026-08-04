@@ -5,10 +5,12 @@ tqdm
 torchmetrics==0.11.4
 lpips
 plyfile
-numpy==1.24.4
+numpy==1.24.3
+scikit-learn
 rerun-sdk==0.17.0
 pcl
 git+https://github.com/openai/CLIP.git
 git+https://github.com/zhanghang1989/PyTorch-Encoding/
 timm
 evo
+mediapy

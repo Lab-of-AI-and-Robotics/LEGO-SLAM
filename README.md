@@ -63,6 +63,10 @@ conda create -n lego_slam python==3.9
 conda activate lego_slam
 conda install pytorch==2.0.0 torchvision==0.15.0 torchaudio==2.0.0 pytorch-cuda=11.8 -c pytorch -c nvidia
 conda install lightning -c conda-forge
+
+# CUDA extensions are built with CUDA 11.8 (same as torch)
+export CUDA_HOME=/usr/local/cuda-11.8
+
 pip install --no-build-isolation -r requirements.txt
 ```
 Also, PCL is needed for fast-gicp submodule.
@@ -87,6 +91,25 @@ python setup.py install
 # gtsam
 conda install conda-forge::gtsam
 ```
+
+For `--feature_mode online`, install the language feature extractor in the same env:
+
+```bash
+conda activate lego_slam
+CUDA_HOME=/usr/local/cuda-11.8 pip install --no-build-isolation \
+    "git+https://github.com/facebookresearch/detectron2.git@b599f13"
+pip install pytorch-lightning==1.9.0 einops jaxtyping sentencepiece
+pip install --no-build-isolation -e clip_sed/language/sed/open_clip
+```
+
+Download the extractor weights from
+[here](https://huggingface.co/datasets/slamDev/OnlineLanguageSplatting)
+and place them under `clip_sed/weights/` (the first file is renamed):
+
+| HuggingFace path | → place as |
+|---|---|
+| `sed_model_large.pth` | `clip_sed/weights/seg_clip_model_l.pth` |
+| `Pretrained_models/omni_general/high_res_71_indoor.ckpt` | `clip_sed/weights/high_res_71_indoor.ckpt` |
 
 <br>
 
@@ -189,34 +212,28 @@ For ScanNet, please follow the data downloading procedure on the [ScanNet](http:
   ```
 </details>
 
-### LSeg Model
+### LSeg Model (offline mode only)
+
+> Only needed for `--feature_mode offline`. In the default online mode, features are
+> extracted on the fly — skip to [Running](#running).
+
 Download `demo_e200.ckpt` from [Google Drive](https://drive.google.com/file/d/1ayk6NXURI_vIPlym16f_RG3ffxBWHxvb/view?usp=sharing) and place it under `Lseg/`.
 
-### Generating Semantic Features
+### Generating Semantic Features (offline mode only)
 
 We use LSeg by default, but any vision-language model that produces per-pixel features (e.g., SAM + CLIP) can be used as a drop-in replacement.
 
-Before running LEGO SLAM, generate semantic features using `run_encoding.sh`:
+Before running LEGO SLAM in offline mode, generate semantic features using `run_encoding.sh`:
 
 ```bash
 bash run_encoding.sh --dataset_path <path> --scenes "<scene1> <scene2> ..." --rgb_dir <folder_name>
 ```
 
-Examples:
-```bash
-# Replica
-bash run_encoding.sh --dataset_path /path/to/Replica --scenes "office0 office1 room0" --rgb_dir images
-
-# ScanNet
-bash run_encoding.sh --dataset_path /path/to/Scannet --scenes "scene0000_00 scene0059_00" --rgb_dir color
-
-# TUM
-bash run_encoding.sh --dataset_path /path/to/TUM --scenes "rgbd_dataset_freiburg2_xyz" --rgb_dir rgb
-```
+`--rgb_dir` is `images` for Replica, `color` for ScanNet, and `rgb` for TUM.
 
 This generates `rgb_feature_langseg/` with feature maps for each RGB image. Note that feature maps can be large; we recommend storing datasets on an SSD.
 
-### Undistorting Feature Maps
+### Undistorting Feature Maps (offline mode only)
 
 For datasets with lens distortion (TUM, ScanNet), the generated feature maps must be undistorted before running SLAM. This step is **not needed for Replica** (zero distortion).
 
@@ -225,13 +242,7 @@ cd utils
 bash undistort_feature.sh <TUM_PATH> <SCANNET_PATH>
 ```
 
-Examples:
-```bash
-# Both TUM and ScanNet
-bash undistort_feature.sh /path/to/TUM /path/to/Scannet
-```
-
-The script applies camera-specific undistortion to each `.pt` feature map in-place using `undistort_feature_img.py`.
+The script applies camera-specific undistortion to each `.pt` feature map in-place.
 
 <br>
 
@@ -244,6 +255,8 @@ bash run_replica.sh /path/to/Replica
 bash run_tum.sh /path/to/TUM
 bash run_scannet.sh /path/to/Scannet
 ```
+
+Runs are in online mode by default; add `--feature_mode offline` to the `lego_slam.py` command to use precomputed LSeg features.
 
 The output `scene.ply` can be viewed in [SuperSplat](https://superspl.at/editor).
 

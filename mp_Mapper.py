@@ -66,6 +66,7 @@ class Mapper(SLAMParameters):
         self.max_sample_size = slam.max_sample_size
         self.sample_ratio = slam.sample_ratio
         self.k_nearest = slam.k_nearest
+        self.prune_min_opacity = slam.prune_min_opacity
         self.pretrained_encoder_path = slam.pretrained_encoder_path
         self.pretrained_decoder_path = slam.pretrained_decoder_path
         self.encoder_flag = slam.encoder_flag
@@ -83,8 +84,8 @@ class Mapper(SLAMParameters):
             # Initialize histograms dictionary for loop closure
             self.histograms = {}
 
-            # Load language codebook for histogram generation
-            self.codebook_path = "saved/language_codebook_64.pkl"
+            # Load language codebook for histogram generation (mode-aware: online=768 SED, offline=512 LSeg)
+            self.codebook_path = f"saved/language_codebook_{os.environ.get('LEGO_FEATURE_MODE', 'online')}.pkl"
             self.vocabulary = None
             self.vocabulary_gpu = None  # Cache for GPU vocabulary
             self.num_clusters = 64
@@ -172,6 +173,8 @@ class Mapper(SLAMParameters):
             self.prune_th = 2.5
         else:
             self.prune_th = 10.0
+        if getattr(slam, "prune_th_cli", -1.0) > 0:
+            self.prune_th = slam.prune_th_cli
         
         
         
@@ -929,7 +932,7 @@ class Mapper(SLAMParameters):
                     valid_pro = total_filter.sum() / mask.sum()
                 
                     if self.train_iter % 200 == 0:
-                        self.gaussians.prune_large_transparent_and_lang(0.005, self.prune_th, self.dist_threshold, self.sim_threshold, self.max_sample_size, self.sample_ratio, self.k_nearest)
+                        self.gaussians.prune_large_transparent_and_lang(self.prune_min_opacity, self.prune_th, self.dist_threshold, self.sim_threshold, self.max_sample_size, self.sample_ratio, self.k_nearest)
 
                     if self.train_iter < self.encoder_warmup_iter or not self.is_encoder_period():
                         # Warming up OR Decoder periods: Update Gaussians with RGB+Depth+Decoder loss
@@ -979,12 +982,12 @@ class Mapper(SLAMParameters):
                     torch.save({
                         'model_state_dict': self.cnn_decoder.state_dict(),
                         'input_dim': 16,
-                        'output_dim': 512,
+                        'output_dim': self.semantic_feature_dim,
                     }, os.path.join(self.output_path, "cnn_decoder.pth"))
                     if self.encoder_flag == 1:
                         torch.save({
                             'model_state_dict': self.cnn_encoder.state_dict(),
-                            'input_dim': 512,
+                            'input_dim': self.semantic_feature_dim,
                             'output_dim': 16,
                         }, os.path.join(self.output_path, "cnn_encoder.pth"))
 
@@ -1173,7 +1176,18 @@ class Mapper(SLAMParameters):
         self.ate_std = stats["std"]
 
         print(result.pretty_str())
-        
+        # greppable one-liner for run drivers (cm, matching paper units)
+        print(f"ATE_RMSE_CM: {self.ate_rmse*100:.4f}", flush=True)
+        # per-frame APE (cm) vs keyframe frame index — diagnose where error spikes
+        try:
+            errs = result.np_arrays["error_array"]
+            ts = list(traj_est.timestamps)
+            order = sorted(range(len(ts)), key=lambda i: ts[i])
+            for i in order:
+                print(f"APE_FRAME {int(ts[i])} {errs[i]*100:.3f}", flush=True)
+        except Exception as _e:
+            print(f"per-frame APE skip: {_e}", flush=True)
+
     def update_gs_mapper(self, refined_kf_poses):
         '''
         propagate pgo update result to slam system
@@ -1226,7 +1240,7 @@ class Mapper(SLAMParameters):
                 network_gui.conn = None
 
     def downsample_feature(self, semantic_feature_img, zero_filter):
-        semantic_feature_point = semantic_feature_img.reshape(-1,512)[self.downsample_idxs]
+        semantic_feature_point = semantic_feature_img.reshape(-1,self.semantic_feature_dim)[self.downsample_idxs]
         semantic_feature_point = semantic_feature_point[zero_filter]
         return semantic_feature_point.squeeze()
 
@@ -1346,6 +1360,88 @@ class Mapper(SLAMParameters):
             render_path_undistorted = None
             feature_path = None
             gt_feature_path = None
+
+        # ONLINE (SED+HR 768): semantic eval against the SED teacher
+        # (same protocol as the offline LSeg eval below, with a 768-D teacher).
+        if os.environ.get("LEGO_FEATURE_MODE", "online") == "online":
+            from clip_sed.extractor import extract as sed_extract
+            from clip_sed.openclip_encoder import OpenCLIPNetwork
+            ade_labels = []
+            with open('Lseg/label_files/ade20k_objectInfo150.txt') as lf:
+                for line in lf.readlines():
+                    ade_labels.append(line.strip().split(',')[-1].split(';')[0])
+            ade_labels = ade_labels[1:]  # drop header (same list as offline get_labels('ade20k'))
+            oc_net = OpenCLIPNetwork("cuda")
+            with torch.no_grad():
+                sed_text_feature = oc_net.encode_text(ade_labels, "cuda").float()  # (150, 768)
+                sed_text_feature = sed_text_feature / torch.clamp(sed_text_feature.norm(dim=-1, keepdim=True), min=1e-8)
+
+            def _sed_cls(fmap):  # (768,H,W) -> (1,H,W) argmax class map, same matching as offline
+                fs = fmap.shape
+                v = fmap.permute(1, 2, 0).reshape(-1, fs[0])
+                v = v / torch.clamp(v.norm(dim=-1, keepdim=True).to(torch.float32), min=1e-8)
+                logits = v.float() @ sed_text_feature.t()
+                return logits.argmax(-1).reshape(fs[1], fs[2]).cpu().numpy()[None]
+
+            cam = self.mapping_cams[0]
+            o_psnrs, o_ssims, o_lpips = [], [], []
+            o_accs, o_ious = [], []
+            for i, c2w in tqdm(enumerate(self.all_kf_poses), desc="online eval"):
+                kf_idx = self.all_kf_poses_idxs[i]
+                # --- GT rgb/depth (identical pipeline to the offline path for a fair comparison) ---
+                gt_rgb = cv2.imread(image_names[kf_idx])
+                gt_depth = cv2.imread(depth_image_names[kf_idx], cv2.IMREAD_UNCHANGED).astype(np.float32)
+                if self.trajmanager.which_dataset == "scannet":
+                    dh, dw = gt_depth.shape
+                    gt_rgb = cv2.resize(gt_rgb, (dw, dh))
+                gt_rgb = cv2.remap(gt_rgb, self.map1x, self.map1y, cv2.INTER_LINEAR, borderValue=[0, 0, 0])
+                gt_mask = np.ones_like(gt_rgb, dtype=np.float32)
+                gt_mask = cv2.remap(gt_mask, self.map1x, self.map1y, cv2.INTER_LINEAR, borderValue=[0, 0, 0])
+                gt_mask_torch = torch.from_numpy(gt_mask).float().cuda().permute(2, 0, 1)
+                gt_rgb = cv2.cvtColor(gt_rgb, cv2.COLOR_RGB2BGR) / 255
+                gt_rgb_ = torch.from_numpy(gt_rgb).float().cuda().permute(2, 0, 1)
+                gt_depth_ = torch.from_numpy(gt_depth).float().cuda().unsqueeze(0)
+                # --- render ---
+                w2c = np.linalg.inv(c2w)
+                cam.R = torch.tensor(w2c[:3, :3])
+                cam.t = torch.tensor(w2c[:3, 3])
+                cam.update_matrix()
+                render_pkg = render_3(cam, self.gaussians, self.pipe, self.background)
+                ours_rgb_ = torch.clamp(render_pkg["render"], 0., 1.).cuda()
+                total_valid_mask = gt_mask_torch * (gt_depth_ > 0)
+                gt_m = gt_rgb_ * total_valid_mask
+                ours_m = ours_rgb_ * total_valid_mask
+                mse_error = torch.mean(torch.mean((gt_m - ours_m) ** 2, axis=2))
+                o_psnrs.append(mse2psnr(mse_error).detach().cpu())
+                _, ssim_error = ssim(ours_m, gt_m)
+                o_ssims.append(ssim_error.detach().cpu())
+                o_lpips.append(cal_lpips(gt_m.unsqueeze(0), ours_m.unsqueeze(0)).detach().cpu())
+                # --- rendered 768-D feature map ---
+                fm = torch.nan_to_num(render_pkg["semantic_feature"], nan=0.0, posinf=0.0, neginf=0.0)
+                fm = F.interpolate(fm.unsqueeze(0), size=(192, 192), mode='bilinear', align_corners=True).squeeze(0)
+                if self.speedup:
+                    fm = self.cnn_decoder(fm)  # 16 -> 768
+                # --- SED-fidelity Acc/IoU (same protocol as offline LSeg eval: teacher argmax vs pred argmax) ---
+                with torch.no_grad():
+                    sed_in = (gt_rgb * 255).astype(np.uint8)  # RGB uint8, same as what the tracker feeds into the extractor
+                    gt_fm = sed_extract(np.ascontiguousarray(sed_in)).float().cuda()  # (768,192,192)
+                    gt_fm = torch.nan_to_num(gt_fm, nan=0.0, posinf=0.0, neginf=0.0)
+                    pred_predict = _sed_cls(fm.detach().float().cuda())
+                    gt_predict = _sed_cls(gt_fm)
+                for element in (pred_predict, gt_predict):  # same label merge as offline
+                    element[element == 90] = 15   # TV -> door
+                    element[element == 29] = 4    # rug -> floor
+                    element[element == 58] = 40   # pillow -> cushion
+                m = F.interpolate(gt_mask_torch[0].unsqueeze(0).unsqueeze(0), size=(192, 192),
+                                  mode='nearest').squeeze().bool().cpu().numpy()[None]
+                o_accs.append(calculate_accuracy(gt_predict[m], pred_predict[m]))
+                o_ious.append(calculate_iou(gt_predict[m], pred_predict[m], 7))
+                del gt_fm
+                torch.cuda.empty_cache()
+            o_psnrs = np.array(o_psnrs); o_ssims = np.array(o_ssims); o_lpips = np.array(o_lpips)
+            print(f"PSNR: {o_psnrs.mean():.2f}\nSSIM: {o_ssims.mean():.3f}\nLPIPS: {o_lpips.mean():.3f}")
+            print(f"accuracy: {np.mean(o_accs):.3f}\nIOU: {np.mean(o_ious):.3f}")
+            return
 
         ## semantic eval
         module = LSegModule.load_from_checkpoint(
