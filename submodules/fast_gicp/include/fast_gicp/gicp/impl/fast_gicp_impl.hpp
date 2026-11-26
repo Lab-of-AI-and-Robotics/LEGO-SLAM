@@ -35,6 +35,7 @@ FastGICP<PointSource, PointTarget, SearchMethodSource, SearchMethodTarget>::Fast
 
   matching_weight_edge_ = 1.0;
   matching_weight_sparse_ = 1.0;
+  source_cov_mid_ = false;
 
   edge_corr_dist_threshold_ = 0.12; // 0.12
   sparse_cov_regularization_factor = 10.;
@@ -68,6 +69,11 @@ void FastGICP<PointSource, PointTarget, SearchMethodSource, SearchMethodTarget>:
 template <typename PointSource, typename PointTarget, typename SearchMethodSource, typename SearchMethodTarget>
 void FastGICP<PointSource, PointTarget, SearchMethodSource, SearchMethodTarget>::setSparseWeight(float weight) {
   matching_weight_sparse_ = weight;
+}
+
+template <typename PointSource, typename PointTarget, typename SearchMethodSource, typename SearchMethodTarget>
+void FastGICP<PointSource, PointTarget, SearchMethodSource, SearchMethodTarget>::setSourceCovMid(bool use_mid) {
+  source_cov_mid_ = use_mid;
 }
 
 template <typename PointSource, typename PointTarget, typename SearchMethodSource, typename SearchMethodTarget>
@@ -952,8 +958,8 @@ bool FastGICP<PointSource, PointTarget, SearchMethodSource, SearchMethodTarget>:
               values = Eigen::Vector3d(1e-9, 1e-9, 1e-9);
             }
             else{          
-              // values = svd.singularValues() / svd.singularValues()(1);
-              values = svd.singularValues() / svd.singularValues().maxCoeff();
+              if (source_cov_mid_) values = svd.singularValues() / svd.singularValues()(1);
+              else values = svd.singularValues() / svd.singularValues().maxCoeff();
               // values = values.array().max(1e-3);
             }
             break;

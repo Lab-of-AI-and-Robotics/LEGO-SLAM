@@ -161,7 +161,6 @@ class SLAMParameters():
         # self.downsample_rate = 10       # tum:5, replica:10
         self.viewer_fps = 10.0
         # self.max_correspondence_distance = 0.25 # tum : 0.03, replica : 0.02
-        self.keyframe_freq = 30  # replica : 10, tum : 10
         self.train = True
         self.training_stage=0
         

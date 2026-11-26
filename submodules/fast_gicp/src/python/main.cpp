@@ -209,6 +209,7 @@ PYBIND11_MODULE(pygicp, m) {
     .def("set_max_knn_distance", &FastGICP::setKNNMaxDistance)
     .def("set_edge_weight", &FastGICP::setEdgeWeight)
     .def("set_sparse_weight", &FastGICP::setSparseWeight)
+    .def("set_source_cov_mid", &FastGICP::setSourceCovMid)
     .def("get_source_rotationsq", [] (FastGICP& gicp){
       return py::array(gicp.getSourceRotationsqSize(), gicp.getSourceRotationsq().data());
       // std::vector<Eigen::Vector4d, Eigen::aligned_allocator<Eigen::Vector4d>> source_rotationsq = gicp.getSourceRotationsq();

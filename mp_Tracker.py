@@ -81,6 +81,9 @@ class Tracker(SLAMParameters):
         self.reg = pygicp.FastGICP()
         
         self.edge_weight = slam.edge_weight
+        self.sparse_weight = slam.sparse_weight
+        self.target_cov = slam.target_cov
+        self.source_cov_norm = slam.source_cov_norm
         
         # Camera poses
         self.trajmanager = TrajManager(self.camera_parameters[8], self.dataset_path)
@@ -151,11 +154,12 @@ class Tracker(SLAMParameters):
         self.reg.set_max_knn_distance(self.knn_max_distance)
         self.reg.set_num_threads(16)
         self.reg.set_edge_weight(self.edge_weight)      # scannet
+        self.reg.set_sparse_weight(self.sparse_weight)
+        self.reg.set_source_cov_mid(self.source_cov_norm == "mid")
         
         if self.trajmanager.which_dataset == "tum":
             self.reg.set_min_iteration(20)
 
-        # self.reg.set_sparse_weight(0.5)
         if_mapping_keyframe = False
 
         self.total_start_time = time.time()
@@ -354,9 +358,11 @@ class Tracker(SLAMParameters):
                     # Get new target gaussians
                     target_points, target_rots, target_scales, target_edge_mask = self.shared_target_gaussians.get_values_np()
                     self.reg.set_input_target(target_points)
-                    # self.reg.set_target_covariances_fromqs(target_rots.flatten(), target_scales.flatten())
-                    target_edge_mask = target_edge_mask.astype(int)
-                    self.reg.set_target_covariances_fromqs_additional(target_rots.flatten(), target_scales.flatten(), target_edge_mask.flatten())
+                    if self.target_cov == "plain":
+                        self.reg.set_target_covariances_fromqs(target_rots.flatten(), target_scales.flatten())
+                    else:
+                        target_edge_mask = target_edge_mask.astype(int)
+                        self.reg.set_target_covariances_fromqs_additional(target_rots.flatten(), target_scales.flatten(), target_edge_mask.flatten())
                     
                     # get refined pose
                     refined_c2w = copy.deepcopy(self.refined_pose_shared)

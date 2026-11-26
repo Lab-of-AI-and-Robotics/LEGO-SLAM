@@ -66,6 +66,7 @@ public:
   void setKNNMaxDistance(float k);
   void setEdgeWeight(float weight);
   void setSparseWeight(float weight);
+  void setSourceCovMid(bool use_mid);
 
   virtual void swapSourceAndTarget() override;
   virtual void clearSource() override;
@@ -266,6 +267,7 @@ protected:
 
   float matching_weight_edge_;
   float matching_weight_sparse_;
+  bool source_cov_mid_;
 
   float edge_corr_dist_threshold_;
 

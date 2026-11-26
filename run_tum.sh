@@ -74,6 +74,10 @@ run_()
                                     --config $config\
                                     --output_path $OUTPUT_PATH/$dataset/init/\
                                     --keyframe_th $keyframe_th\
+                                    --keyframe_freq $keyframe_freq\
+                                    --sparse_weight $sparse_weight\
+                                    --target_cov $target_cov\
+                                    --source_cov_norm $source_cov_norm\
                                     --knn_maxd $knn_maxd\
                                     --overlapped_th $overlapped_th\
                                     --max_correspondence_distance $max_correspondence_distance\
@@ -139,6 +143,10 @@ pose_lr_rate=0.5
 loopclosing_global_correspondence_distance=0.1
 loopclosing_local_correspondence_distance=0.03
 loop_constraint_noise=1e-2
+keyframe_freq=30
+sparse_weight=1.0
+target_cov=additional
+source_cov_norm=max
 
 txt_file="tum_results.txt"
 

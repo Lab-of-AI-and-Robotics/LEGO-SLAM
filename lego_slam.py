@@ -52,6 +52,7 @@ class LEGO_SLAM(SLAMParameters):
         os.makedirs(self.output_path, exist_ok=True)
         self.verbose = args.verbose
         self.keyframe_th = float(args.keyframe_th)
+        self.keyframe_freq = int(args.keyframe_freq)
         self.knn_max_distance = float(args.knn_maxd)
         self.overlapped_th = float(args.overlapped_th)
         self.max_correspondence_distance = float(args.max_correspondence_distance)
@@ -85,6 +86,9 @@ class LEGO_SLAM(SLAMParameters):
         self.encoder_train_interval = int(args.encoder_train_interval)
         self.encoder_train_duration = int(args.encoder_train_duration)
         self.edge_weight = float(args.edge_weight)
+        self.sparse_weight = float(args.sparse_weight)
+        self.target_cov = args.target_cov
+        self.source_cov_norm = args.source_cov_norm
         self.n_trackable_keyframes = int(args.n_trackable_keyframes)
         self.pose_lr_rate = float(args.pose_lr_rate)
         self.loopclosing_global_correspondence_distance = float(args.loopclosing_global_correspondence_distance)
@@ -407,6 +411,7 @@ if __name__ == "__main__":
 
     ## Tracking & Mapping Parameters
     parser.add_argument("--keyframe_th", default=0.7)
+    parser.add_argument("--keyframe_freq", type=int, default=30, help="insert a mapping keyframe every N frames after the last tracking keyframe")
     parser.add_argument("--knn_maxd", default=99999.0)
     parser.add_argument("--overlapped_th", default=5e-4)
     parser.add_argument("--max_correspondence_distance", default=0.02)
@@ -455,6 +460,9 @@ if __name__ == "__main__":
     parser.add_argument("--encoder_train_duration", type=int, default=100, help="duration of each encoder training period")
     
     parser.add_argument("--edge_weight", help="weight of the edge matching factor", default=-1)
+    parser.add_argument("--sparse_weight", default=1.0, help="weight of the sparse matching factor (0 disables it)")
+    parser.add_argument("--target_cov", default="additional", choices=["additional", "plain"], help="target covariances from the map Gaussians: additional = with edge targets, plain = GS-ICP SLAM style")
+    parser.add_argument("--source_cov_norm", default="max", choices=["max", "mid"], help="singular value used to normalize the source covariances")
     parser.add_argument("--n_trackable_keyframes", default=25)
     parser.add_argument("--pose_lr_rate", default=0.5)
     parser.add_argument("--loopclosing_global_correspondence_distance", default=0.5)
